@@ -1,42 +1,44 @@
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { SystemProgram, Transaction ,PublicKey} from '@solana/web3.js';
+import { SystemProgram, Transaction, PublicKey } from '@solana/web3.js';
 import React, { useState } from 'react';
+import { toast, ToastContainer, Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const SendSol = () => {
-    const {connection}=useConnection();
-    const wallet=useWallet();
-    const [receipt,setreceipt]=useState('');
-    const [amount,setAmount]=useState('');
+    const { connection } = useConnection();
+    const wallet = useWallet();
+    const [receipt, setReceipt] = useState('');
+    const [amount, setAmount] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const sendSol = async () => {
         if (!wallet.publicKey || !wallet.signTransaction) {
-            alert("Please connect your wallet.");
+            toast.error("❌ Please connect your wallet.", { theme: "light", transition: Bounce });
             return;
         }
-    
+
         let toPubkey;
         try {
             toPubkey = new PublicKey(receipt);
         } catch (err) {
-            alert("Invalid recipient address");
+            toast.error("❌ Invalid recipient address.", { theme: "light", transition: Bounce });
             return;
         }
-    
+
         const lamports = Number(amount) * 1e9;
         if (isNaN(lamports) || lamports <= 0) {
-            alert("Enter a valid amount");
+            toast.error("❌ Enter a valid amount.", { theme: "light", transition: Bounce });
             return;
         }
-    
+
         try {
-            // Optional: check wallet balance
+            setLoading(true);
             const balance = await connection.getBalance(wallet.publicKey);
             if (balance < lamports) {
-                alert("Insufficient balance");
+                toast.error("❌ Insufficient balance.", { theme: "light", transition: Bounce });
                 return;
             }
-    
-            // Create transaction
+
             const transaction = new Transaction().add(
                 SystemProgram.transfer({
                     fromPubkey: wallet.publicKey,
@@ -44,53 +46,70 @@ const SendSol = () => {
                     lamports,
                 })
             );
-    
-            // Get blockhash and height for confirmation strategy
+
             const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = wallet.publicKey;
-    
-            // Sign and send transaction
+
             const signed = await wallet.signTransaction(transaction);
-    
-            let signature;
-            try {
-                signature = await connection.sendRawTransaction(signed.serialize());
-            } catch (sendErr) {
-                console.error("sendRawTransaction failed", sendErr);
-                alert("Transaction sending failed: " + (sendErr.message || sendErr.toString()));
-                return;
-            }
-    
-            // Confirm transaction using strategy
-            try {
-                await connection.confirmTransaction(
-                    {
-                        signature,
-                        blockhash,
-                        lastValidBlockHeight
-                    },
-                    'confirmed'
-                );
-            } catch (confirmErr) {
-                console.error("Transaction confirmation failed", confirmErr);
-                alert("Transaction sent but confirmation failed: " + (confirmErr.message || confirmErr.toString()));
-                return;
-            }
-    
-            alert("Transaction successful! Signature: " + signature);
+            const signature = await connection.sendRawTransaction(signed.serialize());
+
+            await connection.confirmTransaction(
+                { signature, blockhash, lastValidBlockHeight },
+                'confirmed'
+            );
+
+            toast.success(`✅ Transaction successful!`, {
+                position: "top-right",
+                autoClose: 5000,
+                theme: "light",
+                transition: Bounce,
+            });
+
         } catch (err) {
-            console.error("Send SOL failed", err);
-            alert("Transaction failed: " + (err.message || err.toString()));
+            toast.error(`❌ Transaction failed: ${err.message}`, {
+                position: "top-right",
+                autoClose: 5000,
+                theme: "light",
+                transition: Bounce,
+            });
+        } finally {
+            setLoading(false);
         }
     };
+
     return (
-        <div>
-            <input type="text" placeholder='Address' onChange={(e)=>setreceipt(e.target.value)}/>
-            <input type="text" placeholder='Amount' onChange={(e)=>setAmount(e.target.value)}/>
-            <button onClick={sendSol}>Send SOL</button>
+        <div className="min-h-screen bg-white text-gray-800 flex items-center justify-center px-4">
+            <ToastContainer />
+            <div className="bg-gray-100 rounded-xl shadow-lg p-8 w-full max-w-md space-y-6">
+                <h2 className="text-2xl font-bold text-center">Send SOL</h2>
+
+                <input
+                    type="text"
+                    placeholder="Recipient Address"
+                    value={receipt}
+                    onChange={(e) => setReceipt(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+
+                <input
+                    type="text"
+                    placeholder="Amount in SOL"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+
+                <button
+                    onClick={sendSol}
+                    disabled={loading}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
+                >
+                    {loading ? 'Sending...' : 'Send SOL'}
+                </button>
+            </div>
         </div>
     );
-}
+};
 
 export default SendSol;

@@ -1,6 +1,6 @@
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import React, { useState } from 'react';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast, ToastContainer,Bounce  } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 const Airdrop = () => {
     const wallet = useWallet();
@@ -32,7 +32,6 @@ const Airdrop = () => {
 
         try {
             setLoading(true);
-            setMessage('');
             const signature = await connection.requestAirdrop(wallet.publicKey, Number(amount) * 1e9);
             
             toast.success(`✅ Airdrop successful! Tx: ${signature}`, {
@@ -49,7 +48,7 @@ const Airdrop = () => {
             alert('toast shown')
             
         } catch (error) {
-            setMessage();
+            setMessage(`❌ Airdrop failed ${error.message}`);
             toast.error(`❌ Airdrop failed ${error.message}`, {
                 position: "top-right",
                 autoClose: 5000,
